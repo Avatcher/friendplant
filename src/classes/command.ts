@@ -24,19 +24,10 @@ export class Command{
       this.steps = { };
    }
 
-   add_step(id: string, func: Function): Command{
-      this.steps[id] = func;
-      return this;
-   }
-
    async next(key: string, data: any = undefined){
       if(!(key in this.steps))
-         throw new UndefinedStepError(key);
+         throw new UndefinedStepError(key);   
       
       await this.steps[key].call(this, data);
    }
-
-   //async execute(inter: BaseCommandInteraction){
-   //   await this.steps["main"].call(this, inter);
-   //}
 }
