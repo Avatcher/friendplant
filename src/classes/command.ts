@@ -30,4 +30,9 @@ export class Command{
       
       await this.steps[key].call(this, data);
    }
+
+   add_step(step: string, func: Function): Command{
+      this.steps[step] = func;
+      return this;
+   }
 }

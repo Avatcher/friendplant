@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from "@discordjs/builders";
 import { REST } from "@discordjs/rest";
 import { Routes } from "discord-api-types/v9";
-import { bot_token, bot_id } from "./build/config.js";
+import { bot_token, bot_clientid } from "./build/config.js";
 
 const commands = [
    new SlashCommandBuilder()
@@ -19,6 +19,6 @@ const commands = [
 const rest = new REST({version: '9'})
    .setToken(bot_token);
 
-rest.put(Routes.applicationCommands(bot_id), { body: commands })
+rest.put(Routes.applicationCommands(bot_clientid), { body: commands })
    .then(() => console.log("[cmds] Succesfully applied commands."))
    .catch(console.error);

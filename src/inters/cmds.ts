@@ -26,11 +26,13 @@ export function command(path: cmd_path, func: Function){
 
    if((path.name in _cmds) && (path.step in _cmds[path.name].steps)){
       _cmds[path.name].add_step(path.step, func);
+      
       console.log(`[cmds] Replaced command '${path.name}::${path.step}'`);
    }
    else{
       _cmds[path.name] = new Command(path.name)
             .add_step(path.step, func);
+      
       console.log(`[cmds] Created command '${path.name}::${path.step}'`);
    }
 }
@@ -48,7 +50,7 @@ const _undefined_cmd = async function(inter: BaseCommandInteraction){
 export function get_command(name: string): Function{
    if(!(name in _cmds))
       return _undefined_cmd;
-   return _cmds[name].steps["main"].apply(_cmds[name]);
+   return _cmds[name].steps["main"];
 };
 
 /**
@@ -57,6 +59,7 @@ export function get_command(name: string): Function{
 export function init_cmds(){
    // Импорт команд
    require("../commands/ping");
+   require("../commands/foo");
 
    // Предупреждение если в команде нету шага main
    for(let key of Object.keys(_cmds)){
