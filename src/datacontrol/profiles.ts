@@ -5,7 +5,8 @@ import * as fs from "fs";
 
 interface Ireserved{
    [key: string]: {
-      [key: string]: boolean
+      is_reserved: boolean,
+      free_event: QueueEvent
    }
 }
 interface IProfilePath{
@@ -31,31 +32,45 @@ class QueueEvent{
    }
 }
 
-let _reserved: Ireserved = {};
-let freeEvent: QueueEvent = new QueueEvent();
+let _reservations: Ireserved = {};
 
+
+function _get_key(profile: GuildMember|Profile): string{
+   if(profile instanceof GuildMember)
+      return `${profile.guild.id}:${profile.id}`;
+   return `${profile.guild_id}:${profile.user_id}`;
+}
 /**
  * Зарезервировать профиль пользователя.
  * Запрещает доступ к профилю в дргих командах.
  * @param member Пользователь профиля
  */
-function _reserve(g_id: string, m_id: string): void{
-   if(!(g_id in _reserved))
-      _reserved[g_id] = {};
-   _reserved[g_id][m_id] = true;
+function _reserve(profile: GuildMember|Profile): void{
+   const key: string = _get_key(profile);
+   if(key in _reservations){
+      _reservations[key].is_reserved = true;
+      return;
+   }   
+   _reservations[key] = {
+      is_reserved: true,
+      free_event: new QueueEvent()
+   };
 }
 /**
  * Освободить профиль, открыть доступ всем командам. 
  * @param profile Профиль для освобождения
  */
 function _free(profile: Profile){
-   _reserved[profile.guild_id][profile.user_id] = false;
-   freeEvent.call({
+   const key: string = _get_key(profile);
+   _reservations[key].is_reserved = false;
+   
+   console.log(`[dat] '${key}' activated Free-Event.`);
+   console.log(`      listeners: '${_reservations[key].free_event.queue.length}'`);
+
+   _reservations[key].free_event.call({
       guild_id: profile.guild_id,
       member_id: profile.user_id
-   });
-   console.log("'free' event");
-}
+   });}
 
 /**
  * Зарезервирован ли профиль.
@@ -63,8 +78,8 @@ function _free(profile: Profile){
  * @returns true - зарезервирован, false - свободный доступ
  */
 function _is_reserved(member: GuildMember): boolean{
-   return _reserved[member.guild.id]
-       && _reserved[member.guild.id][member.id];
+   const key: string = _get_key(member);
+   return (key in _reservations) && _reservations[key].is_reserved;
 }
 
 /**
@@ -122,26 +137,22 @@ function _parse_profile(member: GuildMember): Profile{
   * @returns Профиль.
   */
 export async function get_profile(member: GuildMember): Promise<Profile> {
+   const key: string = _get_key(member);
+   
    return new Promise((resolve, reject) => {
       if(!_is_reserved(member)){
-         _reserve(member.guild.id, member.id);
-         console.log("momental get!");
+         _reserve(member);
          resolve(_parse_profile(member));
+         return;
       }
-      else{
-         let listener = function(path: IProfilePath){
-            //console.log(`free event gotcha. '${path.guild_id}:${path.member_id}'`)
-            if((path.guild_id !== member.guild.id) || (path.member_id !== member.id)){
-               console.log(`  Not my profile. I need '${member.guild.id}:${member.id}'`);
-               return;
-            }
-            _reserve(member.guild.id, member.id);
-            console.log("event get!");
-            resolve(_parse_profile(member));       
-         }
 
-         freeEvent.add(listener);
-      }
+      _reservations[key].free_event.add(() => {
+         _reserve(member);
+         resolve(_parse_profile(member));          
+      });
+   
+      console.log(`[dat] '${key}' added a listener.`);
+      console.log(`      listeners: '${_reservations[key].free_event.queue.length}'`);
    })
 }
 

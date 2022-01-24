@@ -1,5 +1,6 @@
 import { BaseCommandInteraction, Interaction } from "discord.js";
 import { Command } from "../classes/command";
+import * as fs from "fs";
 
 interface Icmds{
    [key: string]: Command
@@ -60,6 +61,7 @@ export function init_cmds(){
    // Импорт команд
    require("../commands/ping");
    require("../commands/foo");
+   require("../commands/info");
 
    // Предупреждение если в команде нету шага main
    for(let key of Object.keys(_cmds)){

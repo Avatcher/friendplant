@@ -1,6 +1,6 @@
 import { BaseCommandInteraction, GuildMember } from "discord.js";
 import { command } from "../inters/cmds";
-import { get_profile, save_profile, free_profile } from "../datacontrol/profiles_control";
+import { get_profile, save_profile, free_profile } from "../datacontrol/profiles";
 
 function sleep(ms: number) {
    return new Promise(resolve => setTimeout(resolve, ms));
