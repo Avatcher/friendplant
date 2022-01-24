@@ -1,40 +1,26 @@
 import { BaseCommandInteraction, Interaction } from "discord.js";
-import { Command } from "../classes/command";
 import * as fs from "fs";
 
-interface Icmds{
-   [key: string]: Command
+interface  ICommandsList{
+   [key: string]: Function
 }
 
-let _cmds: Icmds = { };
-
-/**
- * Путь к функции команды
- */
-interface cmd_path{
-   name: string,
-   step?: string,
-}
+let _cmds: ICommandsList = {};
 
 /**  
  * Создает команду для бота.
- * @param path Путь к функции команды
+ * @param name Имя команды
  * @param func Исполняемая функция команды.
 */
-export function command(path: cmd_path, func: Function){
-   if(!path.step)
-      path.step = "main";
+export function command(name: string, func: Function){
 
-   if((path.name in _cmds) && (path.step in _cmds[path.name].steps)){
-      _cmds[path.name].add_step(path.step, func);
-      
-      console.log(`[cmds] Replaced command '${path.name}::${path.step}'`);
+   if(name in _cmds){
+      _cmds[name] = func;
+      console.log(`[cmds] Replaced command '${name}'`);
    }
    else{
-      _cmds[path.name] = new Command(path.name)
-            .add_step(path.step, func);
-      
-      console.log(`[cmds] Created command '${path.name}::${path.step}'`);
+      _cmds[name] = func;
+      console.log(`[cmds] Created command '${name}'`);
    }
 }
 
@@ -51,7 +37,7 @@ const _undefined_cmd = async function(inter: BaseCommandInteraction){
 export function get_command(name: string): Function{
    if(!(name in _cmds))
       return _undefined_cmd;
-   return _cmds[name].steps["main"];
+   return _cmds[name];
 };
 
 /**
@@ -62,13 +48,5 @@ export function init_cmds(){
    require("../commands/ping");
    require("../commands/foo");
    require("../commands/info");
-
-   // Предупреждение если в команде нету шага main
-   for(let key of Object.keys(_cmds)){
-      if("main" in _cmds[key].steps)
-         continue;
-
-      console.log(`[cmds] Undefined main of '${_cmds[key].name}'`);
-      console.log(`       Command cannot be executed!`);
-   }
+   require("../commands/get_emojis");
 }

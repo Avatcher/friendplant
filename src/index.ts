@@ -5,7 +5,7 @@ import { botclient } from "./botclient";
 
 botclient.once("ready", async () => {
    init_cmds();
-   console.log("Bot is ready!");
+   console.log("[bot] Bot is ready! --------------\n");
 });
 
 botclient.on("interactionCreate", async (inter: Interaction)=> {

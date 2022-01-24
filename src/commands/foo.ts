@@ -6,7 +6,7 @@ function sleep(ms: number) {
    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-command({name: "foo"}, async (iter: BaseCommandInteraction)=>{
+command("foo", async (iter: BaseCommandInteraction)=>{
    await iter.reply("Getting your profile...");
 
    let profile = await get_profile(<GuildMember>iter.member);

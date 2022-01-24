@@ -13,6 +13,9 @@ const commands = [
    new SlashCommandBuilder()
       .setName("foo")
       .setDescription("Тестовая команда. ( Не пробуйте использовать )"),
+   new SlashCommandBuilder()
+      .setName("get_emojis")
+      .setDescription("Получить список всех используемых ботом эмодзи."),
 ].map(cmd => cmd.toJSON());
 //console.log(commands);
 
