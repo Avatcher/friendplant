@@ -2,6 +2,8 @@ import { Profile } from "../classes/profile";
 import { GuildMember } from "discord.js";
 import { EventEmitter } from "events";
 import * as fs from "fs";
+import { Transaction } from "../classes/transaction";
+import { botclient } from "../botclient";
 
 interface Ireserved{
    [key: string]: {
@@ -109,10 +111,8 @@ function _parse_profile(member: GuildMember): Profile{
    if(!_is_guild_exists(member.guild.id))
       fs.mkdirSync(`./data/profiles/${member.guild.id}`);
    
-   let profile: Profile;
-
    if(!_is_profile_exists(member)){
-      profile = new Profile(member);
+      let profile = new Profile(member);
       let json: string = JSON.stringify(profile);
       
       fs.writeFileSync(`./data/profiles/${member.guild.id}/${member.id}.json`, json);
@@ -123,14 +123,30 @@ function _parse_profile(member: GuildMember): Profile{
       `./data/profiles/${member.guild.id}/${member.id}.json`,
       { encoding: "utf-8" }
    );
-   profile = JSON.parse(filestr);
-   return profile;
+
+   let profile_obj: Object = JSON.parse(filestr);
+   profile_obj = Object.setPrototypeOf(profile_obj, Profile.prototype);
+   (profile_obj as Profile).history.map(trans =>{
+      trans = Object.setPrototypeOf(trans, Transaction.prototype);
+      trans.time = new Date(trans.time);
+      return trans as Transaction;
+   });
+
+   return profile_obj as Profile;
 }
 
 
 /////////////////////
 // ВНЕШНИЙ ИНТЕРФЕЙС
 
+
+export async function get_profile_byID(guild_id: string, user_id: string): Promise<Profile>{
+   let member:GuildMember|undefined = botclient.guilds.cache.get(guild_id)
+                                    ?.members.cache.get(user_id);
+   if(!member)
+      throw new Error(`Cannot find user by IDs ${guild_id}:${user_id}`);
+   return get_profile(member);
+}
 /**
   * Получить и зарезервировать профиль пользователя.
   * @param member Пользователь профиля.
@@ -138,7 +154,8 @@ function _parse_profile(member: GuildMember): Profile{
   */
 export async function get_profile(member: GuildMember): Promise<Profile> {
    const key: string = _get_key(member);
-   
+   let mem_obj: any
+
    return new Promise((resolve, reject) => {
       if(!_is_reserved(member)){
          _reserve(member);
@@ -148,7 +165,7 @@ export async function get_profile(member: GuildMember): Promise<Profile> {
 
       _reservations[key].free_event.add(() => {
          _reserve(member);
-         resolve(_parse_profile(member));          
+         resolve(_parse_profile(member));
       });
    
       console.log(`[dat] '${key}' added a listener.`);

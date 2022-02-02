@@ -16,6 +16,6 @@ const answer = new MessageEmbed()
    .setTitle("Friendplant v.3.0.0")
    .setDescription(desc);
 
-command("info", async (iter: BaseCommandInteraction)=>{
-   iter.reply({ embeds: [answer] });
+command("info", async (inter)=>{
+   inter.reply({ embeds: [answer] });
 });

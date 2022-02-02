@@ -1,0 +1,14 @@
+[
+   {
+      "name": "foo",
+      "description": "Тестовая команда. (Не пробуйте использовать)",
+      "options": [],
+      "default_permission": null
+   },
+   {
+      "name": "info",
+      "description": "",
+      "options": [],
+      "default_permission": null
+   }
+]

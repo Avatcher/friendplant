@@ -1,8 +1,8 @@
-import { BaseCommandInteraction, Interaction } from "discord.js";
+import { BaseCommandInteraction, CommandInteraction, Interaction } from "discord.js";
 import * as fs from "fs";
 
 interface  ICommandsList{
-   [key: string]: Function
+   [key: string]: (iter: CommandInteraction)=> Promise<void>
 }
 
 let _cmds: ICommandsList = {};
@@ -12,7 +12,7 @@ let _cmds: ICommandsList = {};
  * @param name Имя команды
  * @param func Исполняемая функция команды.
 */
-export function command(name: string, func: Function){
+export function command(name: string, func: (iter: CommandInteraction)=> Promise<void>){
 
    if(name in _cmds){
       _cmds[name] = func;
@@ -34,7 +34,7 @@ const _undefined_cmd = async function(inter: BaseCommandInteraction){
  * @param name Имя команды
  * @returns Команда
  */
-export function get_command(name: string): Function{
+export function get_command(name: string): (inter: CommandInteraction)=> Promise<void>{
    if(!(name in _cmds))
       return _undefined_cmd;
    return _cmds[name];
@@ -45,8 +45,7 @@ export function get_command(name: string): Function{
  */
 export function init_cmds(){
    // Импорт команд
-   require("../commands/ping");
-   require("../commands/foo");
-   require("../commands/info");
-   require("../commands/get_emojis");
+   let command_files = fs.readdirSync("./build/commands");
+   for(let file of command_files)
+      require(`../commands/${file}`);
 }

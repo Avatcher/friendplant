@@ -1,25 +1,42 @@
 
 interface ITransactionTexts{
    preview: string
-   desc: string,
+   desc: string|null,
 }
 
 export class Transaction{
-   _count: number;
+   count: number;
    preview: string;
    desc: string|null;
    time: Date;
 
-   constructor(count: number, texts: ITransactionTexts, time: Date = new Date(Date.now())){
-      this._count = count;
-      this.preview = texts.preview;
-      this.desc = texts.desc;
+   constructor(count: number, time: Date = new Date(Date.now())){
+      this.count = count;
+      this.preview = "Неизвестно";
+      this.desc = null;
       this.time = time;
    }
 
+   set_preview(text: string): Transaction{
+      this.preview = text;
+      return this;
+   }
+   set_description(text: string|null): Transaction{
+      this.desc = text;
+      return this;
+   }
+
    fcount(): string{
-      if(this._count > 0)
-         return "+"+this._count;
-      return "-"+this._count;
+      if(this.count > 0)
+         return "+"+this.count;
+      return this.count.toString();
+   }
+   ftime(): string{
+      const utc = (this.time.getTime() / 1000).toFixed(0);
+      return `<t:${utc}>`;
+   }
+
+   have_desc(): boolean{
+      return this.desc != null;
    }
 }
