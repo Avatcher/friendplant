@@ -6,10 +6,12 @@ const desc: string = `
 Сделано со стараниями и любовью для сервера Crumden.
 **[Присоединяйтесь к нашему серверу!](https://discord.gg/TMQByx7bkx)**
 
-**Автор бота:** Avatcher#0546
-**Язык программирования:** TypeScript
-**Node.js версия:** ${process.version}
-`
+Написано на языке **TypeScript**
+Версия Node.js "**${process.version}**"
+Вы также можете посмотреть код
+бота в моем репозитории **[вот здесь](https://github.com/Avatcher/friendplant)**
+
+Автор бота: Avatcher#0546`;
 
 const answer = new MessageEmbed()
    .setColor("#5865F2")

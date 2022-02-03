@@ -10,6 +10,8 @@ interface Iconfig {
    bot_clientid: string,
    bot_caseguild: string,
    bot_activity: string,
+
+   adminId: string
 }
 interface Iemojis{
    [key: string]: string,

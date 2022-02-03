@@ -5,31 +5,39 @@ interface ITransactionTexts{
 }
 
 export class Transaction{
-   count: number;
+   amount: number;
    preview: string;
    desc: string|null;
    time: Date;
 
-   constructor(count: number, time: Date = new Date(Date.now())){
-      this.count = count;
+   constructor(){
+      this.amount = 0;
       this.preview = "Неизвестно";
       this.desc = null;
-      this.time = time;
+      this.time = new Date(Date.now());
    }
 
-   set_preview(text: string): Transaction{
+   setAmount(amount: number): Transaction{
+      this.amount = amount;
+      return this;
+   }
+   setPreview(text: string): Transaction{
       this.preview = text;
       return this;
    }
-   set_description(text: string|null): Transaction{
+   setDescription(text: string|null): Transaction{
       this.desc = text;
+      return this;
+   }
+   setTime(time: Date){
+      this.time = time;
       return this;
    }
 
    fcount(): string{
-      if(this.count > 0)
-         return "+"+this.count;
-      return this.count.toString();
+      if(this.amount > 0)
+         return "+"+this.amount;
+      return this.amount.toString();
    }
    ftime(): string{
       const utc = (this.time.getTime() / 1000).toFixed(0);

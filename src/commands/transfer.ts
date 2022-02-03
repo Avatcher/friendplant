@@ -1,8 +1,8 @@
 import { GuildMember, MessageEmbed } from "discord.js";
-import { get_profile, save_profile, free_profile } from "../datacontrol/profiles"
 import { command } from "../inters/cmds";
 import { emojis } from "../config"
 import { Transaction } from "../classes/transaction";
+import { datacntl } from "../datacontrol/profiles";
 
 const is_bot_embed = new MessageEmbed()
    .setTitle(":robot: Нельзя сделать перевод боту!")
@@ -14,19 +14,9 @@ const less_zero_embed = new MessageEmbed()
    .setDescription("Количество переводимых средств не может быть меньше нуля,\nэто работает слегка не так...")
    .setColor("RED");
 
-const from_profile_embed = new MessageEmbed()
-   .setTitle(`${emojis.loading} Подождите...`)
-   .setDescription("Ваш профиль сейчас уже где-то используеться,\nно должен скоро освободиться!")
-   .setColor("BLURPLE");
-
-const in_profile_embed = new MessageEmbed()
-   .setTitle(`${emojis.loading} Подождите...`)
-   .setDescription("Профиль для перевода сейча уже где-то используеться,\nно должен скоро освободиться!")
-   .setColor("BLURPLE");
-
-const not_enough_embed = new MessageEmbed()
-   .setTitle("Недостаточно средств!")
-   .setDescription("Может вы ошиблись циферкой?")
+const timeout_embed = new MessageEmbed()
+   .setTitle(":clock2: Превышено время ожидания!")
+   .setDescription("Транзакция отменена.\nПопробуйте еще раз позже.")
    .setColor("RED");
 
 command("transfer", async (inter)=>{
@@ -35,6 +25,7 @@ command("transfer", async (inter)=>{
       await inter.reply({embeds: [is_bot_embed], ephemeral: true});
       return;
    }
+   let member_from = inter.member as GuildMember;
    
    let amount = inter.options.getInteger("amount") as number;
    if(amount <= 0){
@@ -42,33 +33,35 @@ command("transfer", async (inter)=>{
       return;
    }
 
-   let member_from = inter.member as GuildMember;
-
-   await inter.reply({embeds: [from_profile_embed]});
-   let profile_from = await get_profile(member_from);
-   if(profile_from.money < amount){
-      await inter.editReply({embeds: [not_enough_embed]});
-      free_profile(profile_from);
-      return;
+   await inter.deferReply();
+   
+   let res = await datacntl.doTransaction(member_from,
+      new Transaction()
+         .setAmount(-amount)
+         .setPreview(`Перевод к ${member_to}`),
+   5000);
+   
+   switch(res){
+      case datacntl.TransactionResult.NoMoney: {
+         await inter.editReply({embeds:[
+            new MessageEmbed()
+               .setTitle("Недостаточно средств!")
+               .setDescription(`Транзакция отменена.\nНа вашем счету менее \`${amount}\`${emojis.sparkle}`)
+               .setColor("RED")
+         ]});
+         return;
+      }
+      case datacntl.TransactionResult.Timeout: {
+         await inter.editReply({embeds:[timeout_embed]});
+         return;
+      }
    }
 
-   await inter.editReply({embeds: [in_profile_embed]});
-   let profile_to   = await get_profile(member_to);
-
-   profile_from.do_transaction(
-      new Transaction(amount*-1)
-         .set_preview(`Перевод к ${member_to}`)
+   datacntl.doTransaction(member_to,
+      new Transaction()
+         .setAmount(amount)
+         .setPreview(`Перевод от ${member_from}`),
    );
-   profile_to.do_transaction(
-      new Transaction(amount)
-         .set_preview(`Перевод от ${member_from}`)
-   );
-
-   await save_profile(profile_from);
-   await save_profile(profile_to);
-
-   await free_profile(profile_from);
-   await free_profile(profile_to);
 
    await inter.editReply({embeds: [
       new MessageEmbed()

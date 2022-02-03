@@ -1,194 +1,178 @@
-import { Profile } from "../classes/profile";
-import { GuildMember } from "discord.js";
-import { EventEmitter } from "events";
-import * as fs from "fs";
+import { Guild, GuildMember } from "discord.js";
+import { QueryEvent, QueryEventEmitter } from "../classes/queryEvent";
+import * as fs from "node:fs";
+import { Profile, ReadonlyProfile } from "../classes/profile";
 import { Transaction } from "../classes/transaction";
-import { botclient } from "../botclient";
+import { blockQuote } from "@discordjs/builders";
 
-interface Ireserved{
+class ProfileTimeoutError extends Error{
+   constructor(message: string){
+      super(message);
+      this.name = "ProfileTimeoutError"
+   }
+}
+
+let profilesInfo: {
    [key: string]: {
-      is_reserved: boolean,
-      free_event: QueueEvent
+      isReserved: boolean,
+      freeEvent: QueryEvent
    }
+} = {};
+
+function _getKey(member: GuildMember): string{
+   return `${member.guild.id}:${member.id}`;
 }
-interface IProfilePath{
-   guild_id: string;
-   member_id: string;
+function _existsGuild(guild_id: string){
+   return fs.existsSync(`./data/profiles/${guild_id}`);
 }
-
-class QueueEvent{
-   queue: Function[];
-
-   constructor(){
-      this.queue = [];
-   }
-
-   async call(...args: any[]): Promise<void>{
-      let listener: Function|undefined = this.queue.shift();
-      if(!listener)
-         return;
-      await listener(...args);
-   }
-   add(func: Function){
-      this.queue.push(func);
-   }
-}
-
-let _reservations: Ireserved = {};
-
-
-function _get_key(profile: GuildMember|Profile): string{
-   if(profile instanceof GuildMember)
-      return `${profile.guild.id}:${profile.id}`;
-   return `${profile.guild_id}:${profile.user_id}`;
-}
-/**
- * Зарезервировать профиль пользователя.
- * Запрещает доступ к профилю в дргих командах.
- * @param member Пользователь профиля
- */
-function _reserve(profile: GuildMember|Profile): void{
-   const key: string = _get_key(profile);
-   if(key in _reservations){
-      _reservations[key].is_reserved = true;
-      return;
-   }   
-   _reservations[key] = {
-      is_reserved: true,
-      free_event: new QueueEvent()
-   };
-}
-/**
- * Освободить профиль, открыть доступ всем командам. 
- * @param profile Профиль для освобождения
- */
-function _free(profile: Profile){
-   const key: string = _get_key(profile);
-   _reservations[key].is_reserved = false;
-   
-   console.log(`[dat] '${key}' activated Free-Event.`);
-   console.log(`      listeners: '${_reservations[key].free_event.queue.length}'`);
-
-   _reservations[key].free_event.call({
-      guild_id: profile.guild_id,
-      member_id: profile.user_id
-   });}
-
-/**
- * Зарезервирован ли профиль.
- * @param member Пользователь профиля
- * @returns true - зарезервирован, false - свободный доступ
- */
-function _is_reserved(member: GuildMember): boolean{
-   const key: string = _get_key(member);
-   return (key in _reservations) && _reservations[key].is_reserved;
-}
-
-/**
- * Записан ли сервер в базе данных
- * @param g_id ID сервера
- * @returns true - записан, false - нет
- */
-function _is_guild_exists(g_id: string): boolean{
-   return fs.existsSync(`./data/profiles/${g_id}`);
-}
-/**
- * Записан ли профиль в базе данных
- * @param member Пользователь профиля.
- * @returns true - записан, false - нет
- */
-function _is_profile_exists(member: GuildMember): boolean{
-   return _is_guild_exists(member.guild.id)
+function _existsProfile(member: GuildMember): boolean{
+   return _existsGuild(member.guild.id)
        && fs.existsSync(`./data/profiles/${member.guild.id}/${member.id}.json`);
 }
-
-/**
- * Получить профиль из файла.
- * @param member Пользователь профиля.
- * @returns Профиль пользователя.
- */
-function _parse_profile(member: GuildMember): Profile{
-   if(!_is_guild_exists(member.guild.id))
+function _parseProfile(member: GuildMember): Profile{
+   if(!_existsGuild(member.guild.id))
       fs.mkdirSync(`./data/profiles/${member.guild.id}`);
-   
-   if(!_is_profile_exists(member)){
+   if(!_existsProfile(member)){
       let profile = new Profile(member);
-      let json: string = JSON.stringify(profile);
+      let json    = JSON.stringify(profile);
+      fs.writeFileSync(`./data/profiles/${member.guild.id}/${member.id}.json`, json, {encoding: "utf-8"});
       
-      fs.writeFileSync(`./data/profiles/${member.guild.id}/${member.id}.json`, json);
       return profile;
    }
+   let json: string = 
+      fs.readFileSync(`./data/profiles/${member.guild.id}/${member.id}.json`, {encoding: "utf-8"});
+ 
+   let profile = JSON.parse(json);
    
-   let filestr: string = fs.readFileSync(
-      `./data/profiles/${member.guild.id}/${member.id}.json`,
-      { encoding: "utf-8" }
-   );
-
-   let profile_obj: Object = JSON.parse(filestr);
-   profile_obj = Object.setPrototypeOf(profile_obj, Profile.prototype);
-   (profile_obj as Profile).history.map(trans =>{
+   profile = Object.setPrototypeOf(profile, Profile.prototype);
+   (profile as Profile).history.map(trans => {
       trans = Object.setPrototypeOf(trans, Transaction.prototype);
       trans.time = new Date(trans.time);
-      return trans as Transaction;
+      return trans;
    });
-
-   return profile_obj as Profile;
+ 
+   return profile;
 }
-
-
-/////////////////////
-// ВНЕШНИЙ ИНТЕРФЕЙС
-
-
-export async function get_profile_byID(guild_id: string, user_id: string): Promise<Profile>{
-   let member:GuildMember|undefined = botclient.guilds.cache.get(guild_id)
-                                    ?.members.cache.get(user_id);
-   if(!member)
-      throw new Error(`Cannot find user by IDs ${guild_id}:${user_id}`);
-   return get_profile(member);
+function _setReserve(key: string, reserved: boolean){
+   if(!(key in profilesInfo))
+      profilesInfo[key] = {
+         isReserved: reserved,
+         freeEvent: new QueryEvent()
+      }
+   profilesInfo[key].isReserved = reserved;
 }
-/**
-  * Получить и зарезервировать профиль пользователя.
-  * @param member Пользователь профиля.
-  * @returns Профиль.
-  */
-export async function get_profile(member: GuildMember): Promise<Profile> {
-   const key: string = _get_key(member);
-   let mem_obj: any
+function _isReserved(key: string): boolean{
+   return profilesInfo[key].isReserved;
+}
+function _free(key: string){
+   _setReserve(key, false);
+   console.log(`activated free QueryEvent for "${key}"`);
+   profilesInfo[key].freeEvent.emit();
+}
+async function _getProfile(member: GuildMember, ms: number = -1): Promise<Profile>{
+   const key = _getKey(member);
 
-   return new Promise((resolve, reject) => {
-      if(!_is_reserved(member)){
-         _reserve(member);
-         resolve(_parse_profile(member));
+   return new Promise((resolve, reject)=>{
+      if(ms > 0){
+         setTimeout(()=>{
+            reject(new ProfileTimeoutError(`Cannot get profile "${key}" for ${ms}ms`));
+            return;
+         }, ms);
+      }
+
+      let returnResult = function(){
+         _setReserve(key, true);
+         let profile = _parseProfile(member);
+         resolve(profile);
+      }
+
+      if(!(key in profilesInfo)){
+         profilesInfo[key] = {
+            isReserved: true,
+            freeEvent: new QueryEvent()
+         };
+         returnResult();
          return;
       }
 
-      _reservations[key].free_event.add(() => {
-         _reserve(member);
-         resolve(_parse_profile(member));
-      });
-   
-      console.log(`[dat] '${key}' added a listener.`);
-      console.log(`      listeners: '${_reservations[key].free_event.queue.length}'`);
-   })
+      if(_isReserved(key))
+         profilesInfo[key].freeEvent.add(returnResult);
+      else
+         returnResult();
+   });
+}
+async function _saveProfile(profile: Profile): Promise<void>{
+   if(!_existsGuild(profile.guildId))
+      fs.mkdirSync(`./data/profiles/${profile.guildId}`);
+   let json = JSON.stringify(profile);
+   fs.writeFileSync(`./data/profiles/${profile.guildId}/${profile.userId}.json`, json);
 }
 
-/**
-  * Освободить профиль от резервации.
-  * @param profile Профиль
-  */
-export async function free_profile(profile: Profile): Promise<void>{
-   _free(profile);
+export namespace datacntl{
+
+   /**
+    * Результат дії функції doTransaction
+    */
+   export enum TransactionResult{
+      /**
+       * Транзакція пройшла успішно!
+       */
+      Success = "Success",
+      /**
+       * Недостатньо коштів для здіснення транзакції.
+       */
+      NoMoney = "NoMoney",
+      /**
+       * Минуло занадто багато часу, транзакцію відминено.
+       */
+      Timeout = "Timeout"
+   }
+
+   /**
+    * Посилає запрос до бази данних для здійснення транзакції.
+    * @param member Користувач профілю.
+    * @param trans Транзакція.
+    * @param ms Ліміт часу на здійснення транзакції.
+    */
+   export async function doTransaction(member: GuildMember, trans: Transaction, ms: number = -1): Promise<TransactionResult>{
+      let profile: Profile;
+      try{
+         profile = await _getProfile(member, ms);
+      }
+      catch(error){
+         if(error instanceof ProfileTimeoutError)
+            return TransactionResult.Timeout;
+         throw error;
+      }
+
+      if(trans.amount < 0 && profile.enoughMoney(trans.amount)){
+         if(profile.enoughMoney(trans.amount))
+            profile.lostMoney += -trans.amount;
+         else{
+            _free(profile.getKey());
+            return TransactionResult.NoMoney;
+         }
+      }
+      profile.money += trans.amount;
+      profile.addHistory(trans);
+
+      await _saveProfile(profile);
+      _free(profile.getKey());
+
+      return TransactionResult.Success;
+   }
+
+   /**
+    * Повертає незміняємий профиль користувача.
+    * @param member Користувач профілю.
+    */
+   export async function getProfile(member: GuildMember): Promise<ReadonlyProfile>{
+      let profile = await _parseProfile(member);
+      return profile as ReadonlyProfile;
+   }
 }
 
-/**
-  * Сохранить профиль в базу данных.
-  * @param profile Профиль.
-  */
-export async function save_profile(profile: Profile): Promise<void> {
-   if(!fs.existsSync(`./data/profiles/${profile.guild_id}`))
-      fs.mkdirSync(`./data/profiles/${profile.guild_id}`);
-   let json: string = JSON.stringify(profile);
-
-   fs.writeFileSync(`./data/profiles/${profile.guild_id}/${profile.user_id}.json`, json);
+export function block(member: GuildMember){
+   let key = _getKey(member);
+   _setReserve(key, true);
 }

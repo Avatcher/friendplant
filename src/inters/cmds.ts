@@ -1,4 +1,5 @@
-import { BaseCommandInteraction, CommandInteraction, Interaction } from "discord.js";
+import { BaseCommandInteraction, CommandInteraction, Interaction, MessageEmbed } from "discord.js";
+import { config } from "../config";
 import * as fs from "fs";
 
 interface  ICommandsList{
@@ -12,7 +13,7 @@ let _cmds: ICommandsList = {};
  * @param name Имя команды
  * @param func Исполняемая функция команды.
 */
-export function command(name: string, func: (iter: CommandInteraction)=> Promise<void>){
+export function command(name: string, func: (inter: CommandInteraction)=> Promise<void>){
 
    if(name in _cmds){
       _cmds[name] = func;
@@ -22,6 +23,21 @@ export function command(name: string, func: (iter: CommandInteraction)=> Promise
       _cmds[name] = func;
       console.log(`[cmds] Created command '${name}'`);
    }
+}
+
+const needAdmin_embed = new MessageEmbed()
+   .setTitle(":no_entry_sign: Ты - не он.")
+   .setColor("RED");
+
+export function adminCommand(name: string, func: (inter: CommandInteraction)=> Promise<void>){
+   let editedfunc = async (inter: CommandInteraction)=>{
+      if(inter.user.id != config.adminId){
+         await inter.reply({embeds:[needAdmin_embed], ephemeral: true});
+         return;
+      }
+      await func(inter);
+   }
+   command(name, editedfunc);
 }
 
 const _undefined_cmd = async function(inter: BaseCommandInteraction){
